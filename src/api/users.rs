@@ -1,13 +1,17 @@
-use crate::api_response::ApiResponse;
-use actix_web::{web, HttpResponse, Responder};
+use crate::services::UserService;
+use actix_web::web::{get, scope, Data, ServiceConfig};
+use actix_web::{HttpResponse, Responder};
+use sqlx::PgPool;
 
-pub fn user_routes(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::scope("/api/v1").route("/users", web::get().to(list_users)));
+pub async fn list_users(pool: Data<PgPool>) -> impl Responder {
+    let user_service = UserService::new(pool.get_ref().clone());
+
+    match user_service.find_all_users().await {
+        Ok(users) => HttpResponse::Ok().json(users),
+        Err(_) => HttpResponse::InternalServerError().body("Failed to fetch users"),
+    }
 }
 
-pub async fn list_users() -> impl Responder {
-    let data = vec!["Alice".to_string(), "Bob".to_string()];
-    let response = ApiResponse::success(data);
-
-    HttpResponse::Ok().json(response)
+pub fn user_routes(cfg: &mut ServiceConfig) {
+    cfg.service(scope("/api/v1").route("/users", get().to(list_users)));
 }
